@@ -1,4 +1,21 @@
+using Admission.DAL;
 var builder = WebApplication.CreateBuilder(args);
+
+
+
+var connectionString =
+    builder.Configuration.GetConnectionString(
+        "DefaultConnection"
+    );
+
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "Database connection string is not configured."
+    );
+}
+
+builder.Services.AddDataAccess(connectionString);
 
 // Add services to the container.
 
