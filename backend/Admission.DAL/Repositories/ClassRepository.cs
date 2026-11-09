@@ -1,5 +1,5 @@
 ﻿
-using Admission.BLL.Entites;
+using Admission.BLL.Entities;
 using Admission.BLL.Interfaces.Repositories;
 using Admission.DAL.Data;
 using Microsoft.EntityFrameworkCore;

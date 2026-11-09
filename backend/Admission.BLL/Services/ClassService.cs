@@ -1,5 +1,5 @@
 ﻿using Admission.BLL.DTOs.Classes;
-using Admission.BLL.Entites;
+using Admission.BLL.Entities;
 using Admission.BLL.Interfaces.Repositories;
 using Admission.BLL.Interfaces.Services;
 using System;
@@ -30,6 +30,12 @@ public class ClassService : IClassService
         {
             throw new ArgumentException(
                 "Class name is required."
+            );
+        }
+        if (name.Length > 150)
+        {
+            throw new ArgumentException(
+                "Class name cannot exceed 150 characters."
             );
         }
 
