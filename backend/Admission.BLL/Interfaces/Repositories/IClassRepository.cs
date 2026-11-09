@@ -1,26 +1,22 @@
-﻿using Admission.BLL.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
+using Admission.BLL.DTOs.Classes;
+using Admission.BLL.Entities;
 
-namespace Admission.BLL.Interfaces.Repositories
+namespace Admission.BLL.Interfaces.Repositories;
+
+public interface IClassRepository
 {
-    public interface IClassRepository
-    {
-        Task AddAsync(
-            AdmissionClass admissionClass,
-            CancellationToken cancellationToken = default
-        );
+    Task AddAsync(
+        AdmissionClass admissionClass,
+        CancellationToken cancellationToken = default
+    );
 
-        Task<IReadOnlyList<AdmissionClass>> GetAllAsync(
-            CancellationToken cancellationToken = default
-        );
+    Task<IReadOnlyList<ClassResponseDto>> GetAllAsync(
+        CancellationToken cancellationToken = default
+    );
 
-        Task<AdmissionClass?> GetByIdAsync(
-            string id,
-            CancellationToken cancellationToken = default
-        );
-    }
+    Task<ClassResponseDto?> GetByIdAsync(
+        string id,
+        CancellationToken cancellationToken = default
+    );
 }

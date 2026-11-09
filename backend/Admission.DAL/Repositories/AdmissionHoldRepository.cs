@@ -190,4 +190,131 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
             );
     }
 
+    public async Task<(
+        HoldConfirmationStatus Status,
+        AdmissionHold? Hold
+    )> TryConfirmAsync(
+        string holdId,
+        string studentId,
+        DateTimeOffset currentUtcTime,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+
+        try
+        {
+            // 1. Lock the selected hold row
+            var holdRows = await _context.AdmissionHolds
+                .FromSqlInterpolated(
+                    $"SELECT * FROM admission_holds WHERE id = {holdId} FOR UPDATE"
+                )
+                .AsTracking()
+                .ToListAsync(cancellationToken);
+
+            var hold = holdRows.SingleOrDefault();
+
+            // 2. Check whether hold exists
+            if (hold == null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+
+                return (
+                    HoldConfirmationStatus.NotFound,
+                    null
+                );
+            }
+
+            // 3. Verify student ownership
+            if (hold.StudentId != studentId)
+            {
+                await transaction.CommitAsync(cancellationToken);
+
+                return (
+                    HoldConfirmationStatus.Forbidden,
+                    null
+                );
+            }
+
+            // 4. Check current hold status
+            switch (hold.Status)
+            {
+                case HoldStatus.Confirmed:
+
+                    await transaction.CommitAsync(cancellationToken);
+
+                    return (
+                        HoldConfirmationStatus.AlreadyConfirmed,
+                        hold
+                    );
+
+                case HoldStatus.Expired:
+
+                    await transaction.CommitAsync(cancellationToken);
+
+                    return (
+                        HoldConfirmationStatus.Expired,
+                        hold
+                    );
+
+                case HoldStatus.Cancelled:
+
+                    await transaction.CommitAsync(cancellationToken);
+
+                    return (
+                        HoldConfirmationStatus.Cancelled,
+                        hold
+                    );
+            }
+
+            // 5. Check hold expiration
+            if (hold.ExpiresAtUtc <= currentUtcTime)
+            {
+                hold.Status = HoldStatus.Expired;
+
+                await _context.SaveChangesAsync(
+                    cancellationToken
+                );
+
+                await transaction.CommitAsync(
+                    cancellationToken
+                );
+
+                return (
+                    HoldConfirmationStatus.Expired,
+                    hold
+                );
+            }
+
+            // 6. Confirm the hold
+            hold.Status = HoldStatus.Confirmed;
+
+            hold.ConfirmedAtUtc = currentUtcTime;
+
+            await _context.SaveChangesAsync(
+                cancellationToken
+            );
+
+            // 7. Commit transaction
+            await transaction.CommitAsync(
+                cancellationToken
+            );
+
+            return (
+                HoldConfirmationStatus.Confirmed,
+                hold
+            );
+        }
+        catch
+        {
+            await transaction.RollbackAsync(
+                CancellationToken.None
+            );
+
+            throw;
+        }
+    }
+
 }
