@@ -18,4 +18,15 @@ public interface IAdmissionHoldRepository
         CancellationToken cancellationToken = default
     );
 
+
+
+    Task<(HoldConfirmationStatus Status, AdmissionHold? Hold)>
+        TryConfirmAsync(
+            string holdId,
+            string studentId,
+            DateTimeOffset currentUtcTime,
+            CancellationToken cancellationToken = default
+        );
+
+
 }

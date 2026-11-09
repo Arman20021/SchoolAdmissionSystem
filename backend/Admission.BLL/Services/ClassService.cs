@@ -1,14 +1,11 @@
-﻿using Admission.BLL.DTOs.Classes;
+﻿
+using Admission.BLL.DTOs.Classes;
 using Admission.BLL.Entities;
 using Admission.BLL.Interfaces.Repositories;
 using Admission.BLL.Interfaces.Services;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Admission.BLL.Services;
+
 public class ClassService : IClassService
 {
     private readonly IClassRepository _classRepository;
@@ -32,6 +29,7 @@ public class ClassService : IClassService
                 "Class name is required."
             );
         }
+
         if (name.Length > 150)
         {
             throw new ArgumentException(
@@ -59,19 +57,23 @@ public class ClassService : IClassService
             cancellationToken
         );
 
-        return MapToResponse(admissionClass);
+        return new ClassResponseDto
+        {
+            Id = admissionClass.Id,
+            Name = admissionClass.Name,
+            TotalSeats = admissionClass.TotalSeats,
+            HeldSeats = 0,
+            ConfirmedSeats = 0,
+            AvailableSeats = admissionClass.TotalSeats
+        };
     }
 
     public async Task<IReadOnlyList<ClassResponseDto>> GetAllAsync(
         CancellationToken cancellationToken = default)
     {
-        var classes = await _classRepository.GetAllAsync(
+        return await _classRepository.GetAllAsync(
             cancellationToken
         );
-
-        return classes
-            .Select(MapToResponse)
-            .ToList();
     }
 
     public async Task<ClassResponseDto?> GetByIdAsync(
@@ -85,29 +87,9 @@ public class ClassService : IClassService
             );
         }
 
-        var admissionClass = await _classRepository.GetByIdAsync(
+        return await _classRepository.GetByIdAsync(
             id,
             cancellationToken
         );
-
-        return admissionClass == null
-            ? null
-            : MapToResponse(admissionClass);
-    }
-
-    private static ClassResponseDto MapToResponse(
-        AdmissionClass admissionClass)
-    {
-        return new ClassResponseDto
-        {
-            Id = admissionClass.Id,
-            Name = admissionClass.Name,
-            TotalSeats = admissionClass.TotalSeats,
-
-            // Hold feature is not implemented yet.
-            HeldSeats = 0,
-            ConfirmedSeats = 0,
-            AvailableSeats = admissionClass.TotalSeats
-        };
     }
 }

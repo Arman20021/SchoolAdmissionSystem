@@ -104,4 +104,65 @@ public class AdmissionHoldService : IAdmissionHoldService
 
         return (HoldCreationStatus.Created, response);
     }
+
+    public async Task<(
+        HoldConfirmationStatus Status,
+        AdmissionHoldResponseDto? Hold
+    )> ConfirmAsync(
+        string holdId,
+        string studentId,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Validate Hold ID
+        holdId = holdId?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(holdId) ||
+            holdId.Length > 40)
+        {
+            throw new ArgumentException(
+                "A valid Hold ID is required."
+            );
+        }
+
+        // 2. Validate Student ID
+        if (string.IsNullOrWhiteSpace(studentId) ||
+            studentId.Length != 17 ||
+            studentId.Any(c => c < '0' || c > '9'))
+        {
+            throw new ArgumentException(
+                "Student ID must contain exactly 17 digits."
+            );
+        }
+
+      
+        var currentUtcTime = DateTimeOffset.UtcNow;
+
+     
+        var result = await _repository.TryConfirmAsync(
+            holdId,
+            studentId,
+            currentUtcTime,
+            cancellationToken
+        );
+
+ 
+        if (result.Hold is null)
+        {
+            return (result.Status, null);
+        }
+
+         
+        var response = new AdmissionHoldResponseDto
+        {
+            Id = result.Hold.Id,
+            ClassId = result.Hold.ClassId,
+            Status = result.Hold.Status.ToString(),
+            CreatedAtUtc = result.Hold.CreatedAtUtc,
+            ExpiresAtUtc = result.Hold.ExpiresAtUtc
+        };
+
+       
+        return (result.Status, response);
+    }
+
 }

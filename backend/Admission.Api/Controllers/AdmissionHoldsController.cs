@@ -97,4 +97,103 @@ public class AdmissionHoldsController : ControllerBase
             });
         }
     }
+
+    // POST: /holds/{holdId}/confirm
+    [HttpPost("/holds/{holdId}/confirm")]
+    [ServiceFilter(typeof(StudentIdentityFilter))]
+    public async Task<ActionResult<AdmissionHoldResponseDto>> Confirm(
+        [FromRoute] string holdId,
+        [FromHeader(Name = "X-Student-Id")] string studentId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _holdService.ConfirmAsync(
+                holdId,
+                studentId,
+                cancellationToken
+            );
+
+            switch (result.Status)
+            {
+                case HoldConfirmationStatus.Confirmed:
+
+                    if (result.Hold == null)
+                    {
+                        return Problem(
+                            title: "Confirmation failed",
+                            detail: "The repository returned an empty hold.",
+                            statusCode: StatusCodes.Status500InternalServerError
+                        );
+                    }
+
+                    return Ok(result.Hold);
+
+                case HoldConfirmationStatus.NotFound:
+
+                    return NotFound(new ProblemDetails
+                    {
+                        Title = "Hold not found",
+                        Detail = "The requested hold does not exist.",
+                        Status = StatusCodes.Status404NotFound
+                    });
+
+                case HoldConfirmationStatus.Forbidden:
+
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        new ProblemDetails
+                        {
+                            Title = "Access denied",
+                            Detail = "You cannot confirm another student's hold.",
+                            Status = StatusCodes.Status403Forbidden
+                        }
+                    );
+
+                case HoldConfirmationStatus.AlreadyConfirmed:
+
+                    return Conflict(new ProblemDetails
+                    {
+                        Title = "Already confirmed",
+                        Detail = "This admission hold has already been confirmed.",
+                        Status = StatusCodes.Status409Conflict
+                    });
+
+                case HoldConfirmationStatus.Expired:
+
+                    return Conflict(new ProblemDetails
+                    {
+                        Title = "Hold expired",
+                        Detail = "This admission hold has expired.",
+                        Status = StatusCodes.Status409Conflict
+                    });
+
+                case HoldConfirmationStatus.Cancelled:
+
+                    return Conflict(new ProblemDetails
+                    {
+                        Title = "Hold cancelled",
+                        Detail = "This admission hold has been cancelled.",
+                        Status = StatusCodes.Status409Conflict
+                    });
+
+                default:
+
+                    return Problem(
+                        title: "Unexpected confirmation result",
+                        statusCode: StatusCodes.Status500InternalServerError
+                    );
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid request",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
 }
