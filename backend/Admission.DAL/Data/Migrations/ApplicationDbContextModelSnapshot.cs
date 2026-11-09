@@ -50,6 +50,73 @@ namespace Admission.DAL.Data.Migrations
                             t.HasCheckConstraint("ck_admission_classes_total_seats_positive", "\"total_seats\" > 0");
                         });
                 });
+
+            modelBuilder.Entity("Admission.BLL.Entities.AdmissionHold", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClassId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("class_id");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StudentId")
+                        .IsRequired()
+                        .HasMaxLength(17)
+                        .HasColumnType("character varying(17)")
+                        .HasColumnName("student_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId")
+                        .HasDatabaseName("ix_admission_holds_student_id");
+
+                    b.HasIndex("ClassId", "StudentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_admission_holds_class_student_active")
+                        .HasFilter("\"status\" IN ('Held', 'Confirmed')");
+
+                    b.HasIndex("ClassId", "Status", "ExpiresAtUtc")
+                        .HasDatabaseName("ix_admission_holds_class_status_expiry");
+
+                    b.ToTable("admission_holds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_admission_holds_student_id_17_digits", "\"student_id\" ~ '^[0-9]{17}$'");
+                        });
+                });
+
+            modelBuilder.Entity("Admission.BLL.Entities.AdmissionHold", b =>
+                {
+                    b.HasOne("Admission.BLL.Entities.AdmissionClass", "AdmissionClass")
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AdmissionClass");
+                });
 #pragma warning restore 612, 618
         }
     }

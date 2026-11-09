@@ -25,6 +25,7 @@ public static class DependencyInjection
         );
 
         services.AddScoped<IClassRepository, ClassRepository>();
+        services.AddScoped<IAdmissionHoldRepository,AdmissionHoldRepository>();
 
         return services;
     }

@@ -1,8 +1,10 @@
+using Admission.BLL.Interfaces.Repositories;
 using Admission.DAL;
 using Admission.BLL.Interfaces.Services;
 using Admission.BLL.Services;
 using Scalar.AspNetCore;
 using Admission.Api.Filters;
+using Admission.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -23,6 +25,38 @@ builder.Services.AddDataAccess(connectionString);
 builder.Services.AddScoped<
     IStudentIdentityValidator,
     StudentIdentityValidator
+>();
+
+// Admission Hold Configuration
+var holdDurationSeconds =
+    builder.Configuration.GetValue<int>(
+        "AdmissionHold:DurationSeconds"
+    );
+
+if (holdDurationSeconds <= 0)
+{
+    throw new InvalidOperationException(
+        "Admission Hold duration must be greater than zero."
+    );
+}
+
+// Admission Hold Service Registration
+builder.Services.AddScoped<IAdmissionHoldService>(
+    serviceProvider =>
+    {
+        var repository =
+            serviceProvider.GetRequiredService<
+                IAdmissionHoldRepository
+            >();
+
+        return new AdmissionHoldService(
+            repository,
+            TimeSpan.FromSeconds(holdDurationSeconds)
+        );
+    }
+);
+builder.Services.AddHostedService<
+    HoldExpirationBackgroundService
 >();
 builder.Services.AddScoped<StudentIdentityFilter>();
 builder.Services.AddScoped<IClassService, ClassService>();
