@@ -1,5 +1,5 @@
 ﻿
-using Admission.BLL.Entites;
+using Admission.BLL.Entities;
  
 using Microsoft.EntityFrameworkCore;
 

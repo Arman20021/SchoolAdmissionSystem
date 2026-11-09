@@ -1,4 +1,4 @@
-﻿using Admission.BLL.Entites;
+﻿using Admission.BLL.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;

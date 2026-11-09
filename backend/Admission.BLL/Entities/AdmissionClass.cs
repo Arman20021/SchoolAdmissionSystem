@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Admission.BLL.Entites
+namespace Admission.BLL.Entities
 {
     public class AdmissionClass
     {

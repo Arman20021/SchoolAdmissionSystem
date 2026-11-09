@@ -1,15 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
+using System.ComponentModel.DataAnnotations;
 
-namespace Admission.BLL.DTOs.Classes
+namespace Admission.BLL.DTOs.Classes;
+
+public class CreateClassDto
 {
-    public class CreateClassDto
-    {
-        public string Name { get; set; } = string.Empty;
+    [Required(ErrorMessage = "Class name is required.")]
+    [StringLength(
+        150,
+        MinimumLength = 1,
+        ErrorMessage = "Class name must be between 1 and 150 characters."
+    )]
+    public string Name { get; set; } = string.Empty;
 
-        public int TotalSeats { get; set; }
-    }
+    [Range(
+        1,
+        int.MaxValue,
+        ErrorMessage = "Total seats must be greater than zero."
+    )]
+    public int TotalSeats { get; set; }
 }

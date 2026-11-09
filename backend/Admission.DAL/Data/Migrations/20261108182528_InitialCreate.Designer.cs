@@ -25,7 +25,7 @@ namespace Admission.DAL.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Admission.BLL.Entites.AdmissionClass", b =>
+            modelBuilder.Entity("Admission.BLL.Entities.AdmissionClass", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(40)

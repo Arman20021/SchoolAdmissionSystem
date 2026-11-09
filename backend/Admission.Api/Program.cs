@@ -1,4 +1,7 @@
 using Admission.DAL;
+using Admission.BLL.Interfaces.Services;
+using Admission.BLL.Services;
+using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -16,7 +19,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddDataAccess(connectionString);
-
+builder.Services.AddScoped<IClassService, ClassService>();
 // Add services to the container.
 
 builder.Services.AddControllers();
@@ -29,6 +32,8 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
