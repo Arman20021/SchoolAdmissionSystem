@@ -2,6 +2,7 @@ using Admission.DAL;
 using Admission.BLL.Interfaces.Services;
 using Admission.BLL.Services;
 using Scalar.AspNetCore;
+using Admission.Api.Filters;
 var builder = WebApplication.CreateBuilder(args);
 
 
@@ -19,7 +20,13 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddDataAccess(connectionString);
+builder.Services.AddScoped<
+    IStudentIdentityValidator,
+    StudentIdentityValidator
+>();
+builder.Services.AddScoped<StudentIdentityFilter>();
 builder.Services.AddScoped<IClassService, ClassService>();
+
 // Add services to the container.
 
 builder.Services.AddControllers();
