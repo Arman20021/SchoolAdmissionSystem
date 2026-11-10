@@ -20,15 +20,20 @@ public class AdmissionHoldsController : ControllerBase
     }
 
     // POST: /admission-holds
-    [HttpPost]
+    [HttpPost("/classes/{classId}/holds")]
     [ServiceFilter(typeof(StudentIdentityFilter))]
     public async Task<ActionResult<AdmissionHoldResponseDto>> Create(
-        [FromBody] CreateAdmissionHoldDto request,
+        [FromRoute] string classId,
         [FromHeader(Name = "X-Student-Id")] string studentId,
         CancellationToken cancellationToken)
     {
         try
         {
+            var request = new CreateAdmissionHoldDto
+            {
+                ClassId = classId
+            };
+
             var result = await _holdService.CreateAsync(
                 request,
                 studentId,
