@@ -293,4 +293,47 @@ public class AdmissionHoldService : IAdmissionHoldService
         return (result.Status, response);
     }
 
+
+
+    public async Task<IReadOnlyList<AdmissionHoldResponseDto>>
+        GetByStudentIdAsync(
+            string studentId,
+            CancellationToken cancellationToken = default)
+    {
+        // 1. Validate Student ID
+        if (string.IsNullOrWhiteSpace(studentId) ||
+            studentId.Length != 17 ||
+            studentId.Any(c => c < '0' || c > '9'))
+        {
+            throw new ArgumentException(
+                "Student ID must contain exactly 17 digits."
+            );
+        }
+
+        // 2. Get current UTC time
+        var currentUtcTime = DateTimeOffset.UtcNow;
+
+        // 3. Retrieve all student holds through Repository
+        var holds = await _repository.GetByStudentIdAsync(
+            studentId,
+            currentUtcTime,
+            cancellationToken
+        );
+
+        // 4. Map Entities to Response DTOs
+        var response = holds
+            .Select(hold => new AdmissionHoldResponseDto
+            {
+                Id = hold.Id,
+                ClassId = hold.ClassId,
+                Status = hold.Status.ToString(),
+                CreatedAtUtc = hold.CreatedAtUtc,
+                ExpiresAtUtc = hold.ExpiresAtUtc
+            })
+            .ToList();
+
+        // 5. Return all student applications
+        return response;
+    }
+
 }

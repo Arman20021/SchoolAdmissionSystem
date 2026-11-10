@@ -529,5 +529,58 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
     }
 
 
+    public async Task<IReadOnlyList<AdmissionHold>> GetByStudentIdAsync(
+        string studentId,
+        DateTimeOffset currentUtcTime,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+
+        try
+        {
+            // 1. Update expired holds belonging to this student
+            await _context.AdmissionHolds
+                .Where(x =>
+                    x.StudentId == studentId &&
+                    x.Status == HoldStatus.Held &&
+                    x.ExpiresAtUtc <= currentUtcTime
+                )
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        x => x.Status,
+                        HoldStatus.Expired
+                    ),
+                    cancellationToken
+                );
+
+            // 2. Retrieve all applications of this student
+            var holds = await _context.AdmissionHolds
+                .AsNoTracking()
+                .Where(x => x.StudentId == studentId)
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(cancellationToken);
+
+            // 3. Commit transaction
+            await transaction.CommitAsync(
+                cancellationToken
+            );
+
+            // 4. Return all student applications
+            return holds;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(
+                CancellationToken.None
+            );
+
+            throw;
+        }
+    }
+
 
 }

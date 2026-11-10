@@ -373,4 +373,33 @@ public class AdmissionHoldsController : ControllerBase
     }
 
 
+
+    // GET: /me/holds
+    [HttpGet("/me/holds")]
+    [ServiceFilter(typeof(StudentIdentityFilter))]
+    public async Task<ActionResult<IReadOnlyList<AdmissionHoldResponseDto>>> GetMyHolds(
+        [FromHeader(Name = "X-Student-Id")] string studentId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _holdService.GetByStudentIdAsync(
+                studentId,
+                cancellationToken
+            );
+
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid request",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+
 }
