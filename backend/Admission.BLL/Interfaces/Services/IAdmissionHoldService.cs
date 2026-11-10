@@ -33,4 +33,12 @@ public interface IAdmissionHoldService
             string studentId,
             CancellationToken cancellationToken = default
         );
+
+
+    Task<IReadOnlyList<AdmissionHoldResponseDto>>
+        GetByStudentIdAsync(
+            string studentId,
+            CancellationToken cancellationToken = default
+        );
+
 }

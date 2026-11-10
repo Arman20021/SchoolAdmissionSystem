@@ -49,4 +49,10 @@ public interface IAdmissionHoldRepository
             CancellationToken cancellationToken = default
         );
 
+
+    Task<IReadOnlyList<AdmissionHold>> GetByStudentIdAsync(
+    string studentId,
+    DateTimeOffset currentUtcTime,
+    CancellationToken cancellationToken = default
+);
 }
