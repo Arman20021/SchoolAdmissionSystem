@@ -29,4 +29,14 @@ public interface IAdmissionHoldRepository
         );
 
 
+
+    Task<(HoldLookupStatus Status, AdmissionHold? Hold)>
+        TryGetByIdAsync(
+            string holdId,
+            string studentId,
+            DateTimeOffset currentUtcTime,
+            CancellationToken cancellationToken = default
+        );
+
+
 }

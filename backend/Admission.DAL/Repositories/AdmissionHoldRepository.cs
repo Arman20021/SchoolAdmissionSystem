@@ -317,4 +317,88 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
         }
     }
 
+
+    public async Task<(
+        HoldLookupStatus Status,
+        AdmissionHold? Hold
+    )> TryGetByIdAsync(
+        string holdId,
+        string studentId,
+        DateTimeOffset currentUtcTime,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+
+        try
+        {
+            // 1. Lock the selected hold row
+            var holdRows = await _context.AdmissionHolds
+                .FromSqlInterpolated(
+                    $"SELECT * FROM admission_holds WHERE id = {holdId} FOR UPDATE"
+                )
+                .AsTracking()
+                .ToListAsync(cancellationToken);
+
+            var hold = holdRows.SingleOrDefault();
+
+            // 2. Check whether hold exists
+            if (hold == null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+
+                return (
+                    HoldLookupStatus.NotFound,
+                    null
+                );
+            }
+
+            // 3. Verify student ownership
+            if (hold.StudentId != studentId)
+            {
+                await transaction.CommitAsync(cancellationToken);
+
+                return (
+                    HoldLookupStatus.Forbidden,
+                    null
+                );
+            }
+
+            // 4. Check hold expiration
+            if (
+                hold.Status == HoldStatus.Held &&
+                hold.ExpiresAtUtc <= currentUtcTime
+            )
+            {
+                hold.Status = HoldStatus.Expired;
+
+                await _context.SaveChangesAsync(
+                    cancellationToken
+                );
+            }
+
+            // 5. Commit transaction
+            await transaction.CommitAsync(
+                cancellationToken
+            );
+
+            // 6. Return hold details
+            return (
+                HoldLookupStatus.Found,
+                hold
+            );
+        }
+        catch
+        {
+            await transaction.RollbackAsync(
+                CancellationToken.None
+            );
+
+            throw;
+        }
+    }
+
+
 }

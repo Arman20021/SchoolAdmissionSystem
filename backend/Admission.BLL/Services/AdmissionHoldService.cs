@@ -165,4 +165,70 @@ public class AdmissionHoldService : IAdmissionHoldService
         return (result.Status, response);
     }
 
+    public async Task<(
+        HoldLookupStatus Status,
+        AdmissionHoldResponseDto? Hold
+    )> GetByIdAsync(
+        string holdId,
+        string studentId,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Validate Hold ID
+        holdId = holdId?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(holdId) ||
+            holdId.Length > 40)
+        {
+            throw new ArgumentException(
+                "A valid Hold ID is required."
+            );
+        }
+
+        // 2. Validate Student ID
+        if (string.IsNullOrWhiteSpace(studentId) ||
+            studentId.Length != 17 ||
+            studentId.Any(c => c < '0' || c > '9'))
+        {
+            throw new ArgumentException(
+                "Student ID must contain exactly 17 digits."
+            );
+        }
+
+        // 3. Get current UTC time
+        var currentUtcTime = DateTimeOffset.UtcNow;
+
+        // 4. Get hold through Repository
+        var result = await _repository.TryGetByIdAsync(
+            holdId,
+            studentId,
+            currentUtcTime,
+            cancellationToken
+        );
+
+        // 5. Handle unsuccessful lookup
+        if (result.Status != HoldLookupStatus.Found)
+        {
+            return (result.Status, null);
+        }
+
+        if (result.Hold is null)
+        {
+            throw new InvalidOperationException(
+                "Repository returned Found without a Hold."
+            );
+        }
+
+        // 6. Map Entity to Response DTO
+        var response = new AdmissionHoldResponseDto
+        {
+            Id = result.Hold.Id,
+            ClassId = result.Hold.ClassId,
+            Status = result.Hold.Status.ToString(),
+            CreatedAtUtc = result.Hold.CreatedAtUtc,
+            ExpiresAtUtc = result.Hold.ExpiresAtUtc
+        };
+
+        return (HoldLookupStatus.Found, response);
+    }
+
 }
