@@ -196,4 +196,79 @@ public class AdmissionHoldsController : ControllerBase
         }
     }
 
+
+
+
+    // GET: /holds/{holdId}
+    [HttpGet("/holds/{holdId}")]
+    [ServiceFilter(typeof(StudentIdentityFilter))]
+    public async Task<ActionResult<AdmissionHoldResponseDto>> GetById(
+        [FromRoute] string holdId,
+        [FromHeader(Name = "X-Student-Id")] string studentId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _holdService.GetByIdAsync(
+                holdId,
+                studentId,
+                cancellationToken
+            );
+
+            switch (result.Status)
+            {
+                case HoldLookupStatus.Found:
+
+                    if (result.Hold == null)
+                    {
+                        return Problem(
+                            title: "Hold lookup failed",
+                            detail: "The repository returned an empty hold.",
+                            statusCode: StatusCodes.Status500InternalServerError
+                        );
+                    }
+
+                    return Ok(result.Hold);
+
+                case HoldLookupStatus.NotFound:
+
+                    return NotFound(new ProblemDetails
+                    {
+                        Title = "Hold not found",
+                        Detail = "The requested admission hold does not exist.",
+                        Status = StatusCodes.Status404NotFound
+                    });
+
+                case HoldLookupStatus.Forbidden:
+
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        new ProblemDetails
+                        {
+                            Title = "Access denied",
+                            Detail = "You cannot access another student's hold.",
+                            Status = StatusCodes.Status403Forbidden
+                        }
+                    );
+
+                default:
+
+                    return Problem(
+                        title: "Unexpected hold lookup result",
+                        statusCode: StatusCodes.Status500InternalServerError
+                    );
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid request",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+
 }
