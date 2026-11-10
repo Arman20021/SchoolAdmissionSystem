@@ -271,4 +271,106 @@ public class AdmissionHoldsController : ControllerBase
     }
 
 
+
+
+
+    // DELETE: /holds/{holdId}
+    [HttpDelete("/holds/{holdId}")]
+    [ServiceFilter(typeof(StudentIdentityFilter))]
+    public async Task<ActionResult<AdmissionHoldResponseDto>> Cancel(
+        [FromRoute] string holdId,
+        [FromHeader(Name = "X-Student-Id")] string studentId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _holdService.CancelAsync(
+                holdId,
+                studentId,
+                cancellationToken
+            );
+
+            switch (result.Status)
+            {
+                case HoldCancellationStatus.Cancelled:
+
+                    if (result.Hold == null)
+                    {
+                        return Problem(
+                            title: "Cancellation failed",
+                            detail: "The repository returned an empty hold.",
+                            statusCode: StatusCodes.Status500InternalServerError
+                        );
+                    }
+
+                    return Ok(result.Hold);
+
+                case HoldCancellationStatus.NotFound:
+
+                    return NotFound(new ProblemDetails
+                    {
+                        Title = "Hold not found",
+                        Detail = "The requested admission hold does not exist.",
+                        Status = StatusCodes.Status404NotFound
+                    });
+
+                case HoldCancellationStatus.Forbidden:
+
+                    return StatusCode(
+                        StatusCodes.Status403Forbidden,
+                        new ProblemDetails
+                        {
+                            Title = "Access denied",
+                            Detail = "You cannot cancel another student's hold.",
+                            Status = StatusCodes.Status403Forbidden
+                        }
+                    );
+
+                case HoldCancellationStatus.AlreadyCancelled:
+
+                    return Conflict(new ProblemDetails
+                    {
+                        Title = "Already cancelled",
+                        Detail = "This admission hold has already been cancelled.",
+                        Status = StatusCodes.Status409Conflict
+                    });
+
+                case HoldCancellationStatus.AlreadyConfirmed:
+
+                    return Conflict(new ProblemDetails
+                    {
+                        Title = "Already confirmed",
+                        Detail = "Confirmed admission cannot be cancelled through this endpoint.",
+                        Status = StatusCodes.Status409Conflict
+                    });
+
+                case HoldCancellationStatus.Expired:
+
+                    return Conflict(new ProblemDetails
+                    {
+                        Title = "Hold expired",
+                        Detail = "This admission hold has expired and cannot be cancelled.",
+                        Status = StatusCodes.Status409Conflict
+                    });
+
+                default:
+
+                    return Problem(
+                        title: "Unexpected cancellation result",
+                        statusCode: StatusCodes.Status500InternalServerError
+                    );
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid request",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest
+            });
+        }
+    }
+
+
 }

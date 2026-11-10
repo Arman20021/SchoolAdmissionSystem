@@ -39,4 +39,14 @@ public interface IAdmissionHoldRepository
         );
 
 
+
+
+    Task<(HoldCancellationStatus Status, AdmissionHold? Hold)>
+        TryCancelAsync(
+            string holdId,
+            string studentId,
+            DateTimeOffset currentUtcTime,
+            CancellationToken cancellationToken = default
+        );
+
 }

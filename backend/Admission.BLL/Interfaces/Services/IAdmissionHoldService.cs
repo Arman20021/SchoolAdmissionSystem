@@ -26,4 +26,11 @@ public interface IAdmissionHoldService
             string studentId,
             CancellationToken cancellationToken = default
         );
+
+    Task<(HoldCancellationStatus Status, AdmissionHoldResponseDto? Hold)>
+        CancelAsync(
+            string holdId,
+            string studentId,
+            CancellationToken cancellationToken = default
+        );
 }
