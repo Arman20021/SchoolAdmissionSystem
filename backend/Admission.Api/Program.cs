@@ -154,4 +154,10 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Redirect backend root URL to Scalar in Docker
+if (app.Environment.IsEnvironment("Docker"))
+{
+    app.MapGet("/", () => Results.Redirect("/scalar"));
+}
+
 app.Run();
