@@ -77,12 +77,14 @@ public class AdmissionHoldsController : ControllerBase
                 });
             }
 
+ 
+
             if (result.Status == HoldCreationStatus.DuplicateApplication)
             {
                 return Conflict(new ProblemDetails
                 {
-                    Title = "Duplicate application",
-                    Detail = "You already have an active application for this class.",
+                    Title = "Active application exists",
+                    Detail = "You already have an active application for another class or you have confirmed your seat",
                     Status = StatusCodes.Status409Conflict
                 });
             }

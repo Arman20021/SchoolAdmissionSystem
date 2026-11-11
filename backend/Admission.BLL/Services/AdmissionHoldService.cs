@@ -1,4 +1,5 @@
-﻿
+﻿ 
+
 using Admission.BLL.DTOs.AdmissionHolds;
 using Admission.BLL.Entities;
 using Admission.BLL.Enums;
@@ -93,14 +94,17 @@ public class AdmissionHoldService : IAdmissionHoldService
         }
 
         // Map Entity to Response DTO
+
         var response = new AdmissionHoldResponseDto
         {
-            Id = result.Hold.Id,
+            HoldId = result.Hold.Id,
             ClassId = result.Hold.ClassId,
-            Status = result.Hold.Status.ToString(),
+            StudentId = result.Hold.StudentId,
+            Status = result.Hold.Status.ToString().ToUpperInvariant(),
             CreatedAtUtc = result.Hold.CreatedAtUtc,
-            ExpiresAtUtc = result.Hold.ExpiresAtUtc
+            ExpiresAt = result.Hold.ExpiresAtUtc
         };
+
 
         return (HoldCreationStatus.Created, response);
     }
@@ -134,10 +138,10 @@ public class AdmissionHoldService : IAdmissionHoldService
             );
         }
 
-      
+
         var currentUtcTime = DateTimeOffset.UtcNow;
 
-     
+
         var result = await _repository.TryConfirmAsync(
             holdId,
             studentId,
@@ -145,25 +149,26 @@ public class AdmissionHoldService : IAdmissionHoldService
             cancellationToken
         );
 
- 
+
         if (result.Hold is null)
         {
             return (result.Status, null);
         }
 
-         
+
         var response = new AdmissionHoldResponseDto
         {
-            Id = result.Hold.Id,
+            HoldId = result.Hold.Id,
             ClassId = result.Hold.ClassId,
             Status = result.Hold.Status.ToString(),
             CreatedAtUtc = result.Hold.CreatedAtUtc,
-            ExpiresAtUtc = result.Hold.ExpiresAtUtc
+            ExpiresAt = result.Hold.ExpiresAtUtc
         };
 
-       
+
         return (result.Status, response);
     }
+
 
     public async Task<(
         HoldLookupStatus Status,
@@ -197,7 +202,7 @@ public class AdmissionHoldService : IAdmissionHoldService
         // 3. Get current UTC time
         var currentUtcTime = DateTimeOffset.UtcNow;
 
-        // 4. Get hold through Repository
+        // 4. Retrieve hold through Repository
         var result = await _repository.TryGetByIdAsync(
             holdId,
             studentId,
@@ -221,15 +226,60 @@ public class AdmissionHoldService : IAdmissionHoldService
         // 6. Map Entity to Response DTO
         var response = new AdmissionHoldResponseDto
         {
-            Id = result.Hold.Id,
+            HoldId = result.Hold.Id,
             ClassId = result.Hold.ClassId,
-            Status = result.Hold.Status.ToString(),
-            CreatedAtUtc = result.Hold.CreatedAtUtc,
-            ExpiresAtUtc = result.Hold.ExpiresAtUtc
+            Status = result.Hold.Status.ToString().ToUpperInvariant(),
+            ExpiresAt = result.Hold.ExpiresAtUtc
         };
 
-        return (HoldLookupStatus.Found, response);
+        return (result.Status, response);
     }
+
+
+
+
+
+    public async Task<IReadOnlyList<AdmissionHoldResponseDto>>
+        GetByStudentIdAsync(
+            string studentId,
+            CancellationToken cancellationToken = default)
+    {
+        // 1. Validate Student ID
+        if (string.IsNullOrWhiteSpace(studentId) ||
+            studentId.Length != 17 ||
+            studentId.Any(c => c < '0' || c > '9'))
+        {
+            throw new ArgumentException(
+                "Student ID must contain exactly 17 digits."
+            );
+        }
+
+        // 2. Get current UTC time
+        var currentUtcTime = DateTimeOffset.UtcNow;
+
+        // 3. Retrieve holds with class names
+        var holds = await _repository.GetByStudentIdAsync(
+            studentId,
+            currentUtcTime,
+            cancellationToken
+        );
+
+        // 4. Map to Response DTO
+        var response = holds
+            .Select(item => new AdmissionHoldResponseDto
+            {
+                HoldId = item.Hold.Id,
+                ClassId = item.Hold.ClassId,
+                ClassName = item.ClassName,
+                Status = item.Hold.Status.ToString().ToUpperInvariant(),
+                ExpiresAt = item.Hold.ExpiresAtUtc
+            })
+            .ToList();
+
+        // 5. Return student applications
+        return response;
+    }
+
 
 
 
@@ -283,57 +333,14 @@ public class AdmissionHoldService : IAdmissionHoldService
         // 6. Map Entity to Response DTO
         var response = new AdmissionHoldResponseDto
         {
-            Id = result.Hold.Id,
+            HoldId = result.Hold.Id,
             ClassId = result.Hold.ClassId,
             Status = result.Hold.Status.ToString(),
             CreatedAtUtc = result.Hold.CreatedAtUtc,
-            ExpiresAtUtc = result.Hold.ExpiresAtUtc
+            ExpiresAt = result.Hold.ExpiresAtUtc
         };
 
         return (result.Status, response);
-    }
-
-
-
-    public async Task<IReadOnlyList<AdmissionHoldResponseDto>>
-        GetByStudentIdAsync(
-            string studentId,
-            CancellationToken cancellationToken = default)
-    {
-        // 1. Validate Student ID
-        if (string.IsNullOrWhiteSpace(studentId) ||
-            studentId.Length != 17 ||
-            studentId.Any(c => c < '0' || c > '9'))
-        {
-            throw new ArgumentException(
-                "Student ID must contain exactly 17 digits."
-            );
-        }
-
-        // 2. Get current UTC time
-        var currentUtcTime = DateTimeOffset.UtcNow;
-
-        // 3. Retrieve all student holds through Repository
-        var holds = await _repository.GetByStudentIdAsync(
-            studentId,
-            currentUtcTime,
-            cancellationToken
-        );
-
-        // 4. Map Entities to Response DTOs
-        var response = holds
-            .Select(hold => new AdmissionHoldResponseDto
-            {
-                Id = hold.Id,
-                ClassId = hold.ClassId,
-                Status = hold.Status.ToString(),
-                CreatedAtUtc = hold.CreatedAtUtc,
-                ExpiresAtUtc = hold.ExpiresAtUtc
-            })
-            .ToList();
-
-        // 5. Return all student applications
-        return response;
     }
 
 }

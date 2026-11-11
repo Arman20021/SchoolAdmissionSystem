@@ -20,6 +20,7 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
         _context = context;
     }
 
+
     public async Task<(
         HoldCreationStatus Status,
         AdmissionHold? Hold
@@ -36,7 +37,14 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
 
         try
         {
-            // 1. Lock the selected class row
+            // 1. Lock this student across all application requests.
+            // This prevents simultaneous applications to different classes.
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({hold.StudentId}, 0))",
+                cancellationToken
+            );
+
+            // 2. Lock the selected class to protect seat capacity.
             var classRows = await _context.AdmissionClasses
                 .FromSqlInterpolated(
                     $"SELECT * FROM admission_classes WHERE id = {hold.ClassId} FOR UPDATE"
@@ -57,32 +65,26 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
 
             var now = DateTimeOffset.UtcNow;
 
-            // 2. Find expired holds
-            var expiredHolds = await _context.AdmissionHolds
+            // 3. Expire ALL expired holds belonging to this student,
+            // regardless of which class they belong to.
+            await _context.AdmissionHolds
                 .Where(x =>
-                    x.ClassId == hold.ClassId &&
+                    x.StudentId == hold.StudentId &&
                     x.Status == HoldStatus.Held &&
                     x.ExpiresAtUtc <= now
                 )
-                .ToListAsync(cancellationToken);
-
-            // 3. Update expired holds
-            foreach (var expiredHold in expiredHolds)
-            {
-                expiredHold.Status = HoldStatus.Expired;
-            }
-
-            if (expiredHolds.Count > 0)
-            {
-                await _context.SaveChangesAsync(
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        x => x.Status,
+                        HoldStatus.Expired
+                    ),
                     cancellationToken
                 );
-            }
 
-            // 4. Check duplicate application
+            // 4. Check whether this student has an active
+            // application in ANY class.
             var alreadyApplied = await _context.AdmissionHolds
                 .AnyAsync(x =>
-                    x.ClassId == hold.ClassId &&
                     x.StudentId == hold.StudentId &&
                     (
                         x.Status == HoldStatus.Held ||
@@ -93,7 +95,6 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
 
             if (alreadyApplied)
             {
-                // Commit expired-hold updates before returning.
                 await transaction.CommitAsync(cancellationToken);
 
                 return (
@@ -102,7 +103,7 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
                 );
             }
 
-            // 5. Count occupied seats
+            // 5. Count occupied seats in the selected class.
             var occupiedSeats = await _context.AdmissionHolds
                 .CountAsync(x =>
                     x.ClassId == hold.ClassId &&
@@ -113,10 +114,9 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
                     cancellationToken
                 );
 
-            // 6. Check available capacity
+            // 6. Check available capacity.
             if (occupiedSeats >= admissionClass.TotalSeats)
             {
-                // Preserve expired-hold updates.
                 await transaction.CommitAsync(cancellationToken);
 
                 return (
@@ -125,20 +125,16 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
                 );
             }
 
-            // 7. Create new hold
+            // 7. Create the new hold.
             await _context.AdmissionHolds.AddAsync(
                 hold,
                 cancellationToken
             );
 
-            await _context.SaveChangesAsync(
-                cancellationToken
-            );
+            await _context.SaveChangesAsync(cancellationToken);
 
-            // 8. Commit transaction
-            await transaction.CommitAsync(
-                cancellationToken
-            );
+            // 8. Commit transaction.
+            await transaction.CommitAsync(cancellationToken);
 
             return (
                 HoldCreationStatus.Created,
@@ -529,58 +525,48 @@ public class AdmissionHoldRepository : IAdmissionHoldRepository
     }
 
 
-    public async Task<IReadOnlyList<AdmissionHold>> GetByStudentIdAsync(
-        string studentId,
-        DateTimeOffset currentUtcTime,
-        CancellationToken cancellationToken = default)
+
+    public async Task<IReadOnlyList<(AdmissionHold Hold, string ClassName)>>
+        GetByStudentIdAsync(
+            string studentId,
+            DateTimeOffset currentUtcTime,
+            CancellationToken cancellationToken = default)
     {
-        await using var transaction =
-            await _context.Database.BeginTransactionAsync(
+        // 1. Expire the student's expired holds
+        await _context.AdmissionHolds
+            .Where(x =>
+                x.StudentId == studentId &&
+                x.Status == HoldStatus.Held &&
+                x.ExpiresAtUtc <= currentUtcTime
+            )
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    x => x.Status,
+                    HoldStatus.Expired
+                ),
                 cancellationToken
             );
 
-        try
-        {
-            // 1. Update expired holds belonging to this student
-            await _context.AdmissionHolds
-                .Where(x =>
-                    x.StudentId == studentId &&
-                    x.Status == HoldStatus.Held &&
-                    x.ExpiresAtUtc <= currentUtcTime
-                )
-                .ExecuteUpdateAsync(
-                    setters => setters.SetProperty(
-                        x => x.Status,
-                        HoldStatus.Expired
-                    ),
-                    cancellationToken
-                );
+        // 2. Join AdmissionHolds with AdmissionClasses
+        var results = await (
+            from hold in _context.AdmissionHolds.AsNoTracking()
+            join admissionClass in _context.AdmissionClasses.AsNoTracking()
+                on hold.ClassId equals admissionClass.Id
+            where hold.StudentId == studentId
+            orderby hold.CreatedAtUtc descending
+            select new
+            {
+                Hold = hold,
+                ClassName = admissionClass.Name
+            }
+        ).ToListAsync(cancellationToken);
 
-            // 2. Retrieve all applications of this student
-            var holds = await _context.AdmissionHolds
-                .AsNoTracking()
-                .Where(x => x.StudentId == studentId)
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .ThenByDescending(x => x.Id)
-                .ToListAsync(cancellationToken);
-
-            // 3. Commit transaction
-            await transaction.CommitAsync(
-                cancellationToken
-            );
-
-            // 4. Return all student applications
-            return holds;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(
-                CancellationToken.None
-            );
-
-            throw;
-        }
+        // 3. Return hold and class name
+        return results
+            .Select(x => (x.Hold, x.ClassName))
+            .ToList();
     }
-
-
 }
+
+
+
