@@ -1,0 +1,33 @@
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# .NET build output
+**/bin/
+**/obj/
+**/TestResults/
+
+# Node dependencies
+**/node_modules/
+
+# Frontend build output
+**/dist/
+**/.vite/
+
+# Visual Studio
+.vs/
+
+# Temporary files
+**/*.log
+**/*.tmp
+**/*.user
+**/*.suo
+
+# Docker data
+**/docker-data/

@@ -1,22 +1,74 @@
 
 services:
+
+ 
   postgres:
     image: postgres:16-alpine
-    container_name: admission-postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-admission_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-    ports:
-      - "5433:5432"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admission_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-admission_db}
+
     volumes:
-      - admission_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d admission_db"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
+    restart: unless-stopped
+
+
+   # ASP.NET Core Backend
+ 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Admission.Api/Dockerfile
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ASPNETCORE_URLS: http://+:8080
+
+      DATABASE_CONNECTION_STRING: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-admission_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-admission_dev_password}"
+
+      HOLD_DURATION_SECONDS: ${HOLD_DURATION_SECONDS:-600}
+      AdmissionHold__CheckIntervalSeconds: ${HOLD_CHECK_INTERVAL_SECONDS:-1}
+
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:5173}
+
+    ports:
+      - "8080:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+ 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+
+    ports:
+      - "5173:80"
+
+    depends_on:
+      backend:
+        condition: service_started
+
+    restart: unless-stopped
+
+
+ 
 volumes:
-  admission_postgres_data:
+  postgres_data:
