@@ -50,9 +50,12 @@ public interface IAdmissionHoldRepository
         );
 
 
-    Task<IReadOnlyList<AdmissionHold>> GetByStudentIdAsync(
-    string studentId,
-    DateTimeOffset currentUtcTime,
-    CancellationToken cancellationToken = default
-);
+
+    Task<IReadOnlyList<(AdmissionHold Hold, string ClassName)>>
+        GetByStudentIdAsync(
+            string studentId,
+            DateTimeOffset currentUtcTime,
+            CancellationToken cancellationToken = default
+        );
+
 }
